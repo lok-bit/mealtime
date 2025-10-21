@@ -19,8 +19,10 @@
     #sidebar {
         width: 50%;
         padding: 16px;
+        padding-right: 80px;
         overflow-y: auto;
         height: 100vh;
+        position: relative;
     }
     #wheel{
         position: fixed;
@@ -41,17 +43,18 @@
     #restaurant-buttons {
         display: flex;
         flex-direction: column;
-        position: fixed;
-        left: 50%;
-        top: 50%;
-        transform: translateY(-50%);
+        position: absolute;
+        right: 0;
+        top: 0;
         padding: 10px;
-        z-index: 10;
     }
     .restaurant-type {
         margin-bottom: 8px;
         writing-mode: vertical-rl;
         text-orientation: upright;
+    }
+    #search-input {
+        max-width: 100%;
     }
 </style>
 
