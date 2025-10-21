@@ -69,12 +69,12 @@
             <div id="wheel"></div>
             <canvas id="canvas" width="600" height="600"></canvas>
             <div id="restaurant-buttons">
-                <button class="btn btn-secondary restaurant-type" data-type="中式餐廳">中式</button>
-                <button class="btn btn-secondary restaurant-type" data-type="日式料理">日式</button>
-                <button class="btn btn-secondary restaurant-type" data-type="火鍋">火鍋</button>
-                <button class="btn btn-secondary restaurant-type" data-type="咖哩">咖哩</button>
-                <button class="btn btn-secondary restaurant-type" data-type="速食">快餐</button>
-                <button class="btn btn-secondary restaurant-type" data-type="燒烤">燒烤</button>
+                <button class="btn btn-secondary restaurant-type" data-type="chinese restaurant">中式</button>
+                <button class="btn btn-secondary restaurant-type" data-type="japanese restaurant">日式</button>
+                <button class="btn btn-secondary restaurant-type" data-type="hot pot restaurant">火鍋</button>
+                <button class="btn btn-secondary restaurant-type" data-type="curry restaurant">咖哩</button>
+                <button class="btn btn-secondary restaurant-type" data-type="fast food restaurant">快餐</button>
+                <button class="btn btn-secondary restaurant-type" data-type="barbecue restaurant">燒烤</button>
             </div>
         </div>
     </div>
@@ -209,14 +209,15 @@
             try {
                 // 使用新版 Place.searchByText
                 const request = {
-                    textQuery: keyword,
+                    textQuery: keyword + ' near me',  // 加上 near me 提高精準度
                     fields: ['displayName', 'location', 'rating', 'formattedAddress', 'internationalPhoneNumber', 'id'],
                     locationBias: {
                         center: currentPosition,
-                        radius: 2000  // 增加搜尋半徑到 2km
+                        radius: 2000
                     },
                     maxResultCount: 20,
-                    language: 'zh-TW'
+                    language: 'zh-TW',
+                    includedType: 'restaurant'  // 限定為餐廳類型
                 };
 
                 const { places } = await Place.searchByText(request);
