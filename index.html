@@ -17,22 +17,8 @@
         height: 100vh;
     }
     #sidebar {
-        width: 50%;
+        
         padding: 16px;
-        overflow-y: auto;
-        height: 100vh;
-        position: relative;
-    }
-    #search-input {
-        width: 50%;
-    }
-    #restaurant-list {
-        width: 50%;
-    }
-    #restaurant-list .list-group-item {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
     }
     #wheel{
         position: fixed;
@@ -57,14 +43,11 @@
         right: 0;
         top: 0;
         padding: 10px;
-        z-index: 100;
-        pointer-events: auto;
     }
     .restaurant-type {
         margin-bottom: 8px;
         writing-mode: vertical-rl;
         text-orientation: upright;
-        pointer-events: auto;
     }
 </style>
 
@@ -89,6 +72,7 @@
                 <button class="btn btn-secondary restaurant-type" data-type="curry">咖哩</button>
                 <button class="btn btn-secondary restaurant-type" data-type="fast_food">快餐</button>
                 <button class="btn btn-secondary restaurant-type" data-type="barbecue">燒烤</button>
+                <!-- 你可以根據需要新增更多按鈕 -->
             </div>
         </div>
     </div>
@@ -102,24 +86,15 @@
         let directionsService;
         let directionsRenderer;
         let infoWindow;
-        let currentType = null;
-        let typeMarkers = [];
+        let currentType = null; // 當前選中的餐廳類型
+        let typeMarkers = []; // 存儲當前類型餐廳的標記
         let markedPlaces = [];
-        let Place, AdvancedMarkerElement;
  
-        async function initMap(){
-            // 載入新版 libraries
-            const { Map } = await google.maps.importLibrary("maps");
-            const { AdvancedMarkerElement: AME } = await google.maps.importLibrary("marker");
-            const { Place: PlaceClass } = await google.maps.importLibrary("places");
-            
-            AdvancedMarkerElement = AME;
-            Place = PlaceClass;
-
-            map = new Map(document.getElementById('map'),{
+    
+        function initMap(){ //地圖和文字搜尋的資料
+            map = new google.maps.Map(document.getElementById('map'),{
                 center:{lat: 23.553118, lng: 121.0211024},
                 zoom: 7,
-                mapId: 'DEMO_MAP_ID'
             });
     
             navigator.geolocation.getCurrentPosition(function (position){
@@ -205,11 +180,12 @@
                                 `
                             );
                             infoWindow.open(map, marker);
-                            addMarkedPlace(selectedRestaurant);
+                            addMarkedPlace(selectedRestaurant); // 添加被標記的商家
                         }
                     });
                 });
     
+                // 添加藍點標記來顯示當前位置
                 new google.maps.Marker({
                     position: currentPosition,
                     map: map,
@@ -230,76 +206,64 @@
             typeMarkers = [];
         }
     
-        async function searchRestaurants(type) {
-            if (!Place) {
-                alert('地圖尚未載入完成，請稍後再試');
-                return;
-            }
+        function searchRestaurants(type) { //種類搜尋
+            const service = new google.maps.places.PlacesService(map);
+            const request = {
+                location: currentPosition,
+                radius: '1000',
+                type: ['restaurant'],
+                keyword: type
+            };
+    
+            service.nearbySearch(request, function (results, status) {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    markedPlaces = results;
 
-            try {
-                const request = {
-                    textQuery: type + ' restaurant',
-                    fields: ['displayName', 'location', 'rating', 'formattedAddress', 'internationalPhoneNumber', 'id'],
-                    locationBias: {
-                        center: currentPosition,
-                        radius: 1000
-                    },
-                    maxResultCount: 20,
-                    language: 'zh-TW'
-                };
-
-                const { places } = await Place.searchByText(request);
-                
-                if (!places || places.length === 0) {
-                    alert('附近沒有找到相關餐廳');
-                    return;
-                }
-
-                // 轉換成你原本的格式
-                markedPlaces = places.map(place => ({
-                    name: place.displayName,
-                    place_id: place.id,
-                    formatted_phone_number: place.internationalPhoneNumber,
-                    vicinity: place.formattedAddress,
-                    rating: place.rating,
-                    geometry: {
-                        location: {
-                            lat: () => place.location.lat,
-                            lng: () => place.location.lng
-                        }
-                    }
-                }));
-
-                markedPlaces.forEach(place => {
-                    const marker = new google.maps.Marker({
-                        map: map,
-                        position: new google.maps.LatLng(place.geometry.location.lat(), place.geometry.location.lng()),
-                        title: place.name
-                    });
+                    results.forEach(place => {
+                        
+                        const marker = new google.maps.Marker({
+                            map: map,
+                            position: place.geometry.location,
+                            title: place.name
+                        });
+                        
+                        
+                        typeMarkers.push(marker);
+    
+                        google.maps.event.addListener(marker, 'click', function() {
+                            if(!infoWindow) {
+                                infoWindow = new google.maps.InfoWindow();
+                            }
+    
+                            infoWindow.setContent(
+                                `
+                                <h3>${place.name}</h3>
+                                <div>地址:${place.vicinity}</div>
+                                <div>評分:${place.rating}</div>
+                                `
+                            );
+                            infoWindow.open(map, marker);
+                            addMarkedPlace(place); // 添加被標記的商家
+                        });
                     
-                    typeMarkers.push(marker);
-
-                    google.maps.event.addListener(marker, 'click', function() {
-                        if(!infoWindow) {
-                            infoWindow = new google.maps.InfoWindow();
-                        }
-
-                        infoWindow.setContent(
-                            `
-                            <h3>${place.name}</h3>
-                            <div>地址:${place.vicinity}</div>
-                            <div>評分:${place.rating}</div>
-                            `
-                        );
-                        infoWindow.open(map, marker);
-                        addMarkedPlace(place);
-                    });
-                });
-
-            } catch (error) {
-                console.error('搜尋錯誤:', error);
-                alert('搜尋餐廳時發生錯誤');
-            }
+                
+            
+                    
+                        
+                        typeMarkers.push(marker);
+    
+                        google.maps.event.addListener(marker, 'click', function() {
+                            if(!infoWindow) {
+                                infoWindow = new google.maps.InfoWindow();
+                            }
+    
+                           
+                            infoWindow.open(map, marker);
+                            //addMarkedPlace(place); // 添加被標記的商家
+                        });
+                    
+                })}
+            });
         }
 
 
@@ -316,12 +280,13 @@
             });
         }
 
+        // console.log(markedPlaces[0])
         function addMarkedPlace(place) {
             const markedPlace = {
                 name: place.name,
             };
             markedPlaces.push(markedPlace);
-            console.log(markedPlaces);
+            console.log(markedPlaces); // 打印被標記的商家資訊
         }
     
         document.querySelectorAll('.restaurant-type').forEach(button => {
@@ -329,16 +294,30 @@
                 const type = this.getAttribute('data-type');
                 
                 if (currentType === type) {
+                    // 取消選中當前類型，清除標記
                     clearTypeMarkers();
-                    markedPlaces = [];
                     currentType = null;
                 } else {
-                    // 不要清除標記,只是切換類型
+                    // 切換到新的類型
+                    clearTypeMarkers();
                     currentType = type;
                     searchRestaurants(type);
                 }
+                //displayMarkedPlaces();
             });
         });
+    
+        /*function displayMarkedPlaces() {
+            const restaurantListElement = document.getElementById('restaurant-list');
+            restaurantListElement.innerHTML = '';
+            markedPlaces.forEach(place => {
+                restaurantListElement.innerHTML += `
+                    <li class="list-group-item">
+                        ${place.name} - ${place.address}
+                    </li>
+                `;
+            });
+        }*/
     
         const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
         
@@ -354,9 +333,9 @@
         });
 
         
-        const colors =['#eae56f','#89f26e','#7de6ef','#e7706f'];
+        const colors =['#eae56f','#89f26e','#7de6ef','#e7706f'] ; //輪盤顏色
         
-        const wheel = new Winwheel({
+        const wheel = new Winwheel({ //輪盤
             numSegments: restaurantList.length,
             segments: restaurantList.map((restaurant, index) => {
                 if (restaurant && restaurant.name) {
@@ -435,7 +414,7 @@
                                 `
                             );
                             infoWindow.open(map, marker);
-                            addMarkedPlace(selectedRestaurant);
+                            addMarkedPlace(selectedRestaurant); // 添加被標記的商家
                         }
                     });
                 
@@ -444,7 +423,7 @@
             }
         })
 
-        document.getElementById('add').addEventListener('click', function() {
+        document.getElementById('add').addEventListener('click', function() { //新增我的最愛
             document.getElementById('restaurant-list').innerHTML += `
                 <li class="list-group-item">
                     ${selectedRestaurant.name}
@@ -465,25 +444,30 @@
             localStorage.setItem('restaurantList', JSON.stringify(restaurantList));
         });
            
-        document.getElementById('add1').addEventListener('click', function() {
-            let newInnerHTML = '';
-            
-            markedPlaces.forEach(place => {
-                newInnerHTML += `
-                    <li class="list-group-item">
-                        ${place.name}
-                        <button class="btn-close float-end remove"></button>
-                    </li>
-                `;     
-            });
-            
-            document.getElementById('restaurant-list').innerHTML += newInnerHTML;
-            let restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
-            renderRestaurantList();
-            wheel.draw();
-        });
+document.getElementById('add1').addEventListener('click', function() { //新增我的最愛
+    let newInnerHTML = '';
+    
+    markedPlaces.forEach(place => {
         
-        document.getElementById('restaurant-list').addEventListener('click', function(e) {
+            // 构建新的列表项的 HTML，但不立即修改 DOM
+            newInnerHTML += `
+                <li class="list-group-item">
+                    ${place.name}
+                    <button class="btn-close float-end remove"></button>
+                </li>
+            `;     
+    });
+    
+    document.getElementById('restaurant-list').innerHTML += newInnerHTML;
+    let restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
+    renderRestaurantList();
+    wheel.draw();  // 重新绘制轮盤
+    
+});
+        
+
+    
+        document.getElementById('restaurant-list').addEventListener('click', function(e) { //刪除我的最愛
             if(e.target.classList.contains('remove')){
                 e.target.parentNode.remove();
                 const restaurantName = e.target.parentNode.innerText.trim();
@@ -507,37 +491,40 @@
             }
         });
 
-        function renderRestaurantList() {
-            const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
-            
-            markedPlaces.forEach(place => {
-                if (!restaurantList.some(r => r.placeId === place.place_id)) {
-                    restaurantList.push({
-                        name: place.name,
-                        placeId: place.place_id,
-                        phoneNumber : place.formatted_phone_number,
-                        address: place.vicinity,
-                        rating: place.rating,
-                        location: {
-                            lat: place.geometry.location.lat(),
-                            lng: place.geometry.location.lng()
-                        }
-                    });
-                    
-                    const color = colors[restaurantList.length % 4];
-                    wheel.addSegment({
-                        fillStyle: color,
-                        text: place.name,
-                        strokeStyle: 'white',
-                    });
-            
-                };
 
-                localStorage.setItem('restaurantList', JSON.stringify(restaurantList));
+
+function renderRestaurantList() {
+    const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
+    
+    markedPlaces.forEach(place => {
+        if (!restaurantList.some(r => r.placeId === place.place_id)) {  // 避免重复添加
+        restaurantList.push({
+            name: place.name,
+            placeId: place.place_id,
+            phoneNumber : place.formatted_phone_number,
+            address: place.vicinity,
+            rating: place.rating,
+        });
+        
+            
+            const color = colors[restaurantList.length % 4];
+            wheel.addSegment({
+                fillStyle: color,
+                text: place.name,
+                strokeStyle: 'white',
             });
-        }
+    
+        };
 
-        document.getElementById('draw').addEventListener('click', function() {
+    localStorage.setItem('restaurantList', JSON.stringify(restaurantList));
+    });
+}
+    
+
+
+
+
+        document.getElementById('draw').addEventListener('click', function() { //輪盤啟動
             document.getElementById('wheel').style.display = 'block';
             document.getElementById('canvas').style.display = 'block';
             wheel.startAnimation();
@@ -546,8 +533,11 @@
     </script>
     <script 
         async
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCp3an_zxqAuxOhq4GKvNkTZKpafqyQZ8s&loading=async&libraries=places,marker&callback=initMap&region=TW&language=zh-TW">
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCp3an_zxqAuxOhq4GKvNkTZKpafqyQZ8s&loading=async&libraries=places&callback=initMap&region=TW&language=zh-TW">
     </script>   
      
 </body>
 </html>
+
+
+
