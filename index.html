@@ -23,8 +23,11 @@
         height: 100vh;
         position: relative;
     }
-    #sidebar > * {
-        max-width: 50%;
+    #search-input {
+        width: 50%;
+    }
+    #restaurant-list {
+        width: 50%;
     }
     #wheel{
         position: fixed;
@@ -49,14 +52,14 @@
         right: 0;
         top: 0;
         padding: 10px;
+        z-index: 100;
+        pointer-events: auto;
     }
     .restaurant-type {
         margin-bottom: 8px;
         writing-mode: vertical-rl;
         text-orientation: upright;
-    }
-    #search-input {
-        max-width: 100%;
+        pointer-events: auto;
     }
 </style>
 
