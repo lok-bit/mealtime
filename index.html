@@ -315,9 +315,9 @@
         restaurantList.forEach(function(restaurant){
             if (restaurant && restaurant.name) {
                 document.getElementById('restaurant-list').innerHTML += `
-                    <li class="list-group-item">
-                        ${restaurant.name}
-                        <button class="btn-close float-end remove"></button>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px;">${restaurant.name}</span>
+                        <button class="btn-close remove"></button>
                     </li>
                 `;
             }
@@ -325,7 +325,7 @@
 
         const colors = ['#eae56f','#89f26e','#7de6ef','#e7706f'];
         
-        const wheel = new Winwheel({
+        let wheel = new Winwheel({
             numSegments: restaurantList.length || 1,
             segments: restaurantList.length > 0 ? restaurantList.map((restaurant, index) => {
                 if (restaurant && restaurant.name) {
@@ -347,12 +347,78 @@
                 spins: 16,
                 easing: 'Power4.easeInOut',
 
-                callbackFinished: function (segment){
+                callbackFinished: async function (segment){
                     document.getElementById('canvas').style.display = 'none';
                     document.getElementById('wheel').style.display = 'none';
                     wheel.rotationAngle = 0;
                     wheel.draw();
-                    window.alert(segment.text);
+                    
+                    // 找到抽中的餐廳
+                    const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
+                    const selectedRestaurant = restaurantList.find(r => r.name === segment.text);
+                    
+                    if (selectedRestaurant && selectedRestaurant.location) {
+                        window.alert('🎉 抽中: ' + segment.text);
+                        
+                        // 顯示在地圖上
+                        const location = new google.maps.LatLng(
+                            selectedRestaurant.location.lat,
+                            selectedRestaurant.location.lng
+                        );
+                        map.setCenter(location);
+                        map.setZoom(17);
+                        
+                        // 清除舊標記
+                        if(marker) {
+                            marker.map = null;
+                        }
+                        
+                        // 創建新標記
+                        marker = new AdvancedMarkerElement({
+                            map: map,
+                            position: location,
+                            title: selectedRestaurant.name
+                        });
+                        
+                        // 顯示資訊視窗
+                        if(!infoWindow){
+                            infoWindow = new google.maps.InfoWindow();
+                        }
+                        
+                        infoWindow.setContent(
+                            `
+                            <h3>${selectedRestaurant.name}</h3>
+                            <div>地址: ${selectedRestaurant.address || '無'}</div>
+                            <div>電話: ${selectedRestaurant.phoneNumber || '無'}</div>
+                            <div>評分: ${selectedRestaurant.rating || '無'}</div>
+                            `
+                        );
+                        infoWindow.open({
+                            anchor: marker,
+                            map: map
+                        });
+                        
+                        // 導航路線
+                        const directionsService = new google.maps.DirectionsService();
+                        const directionsRenderer = new google.maps.DirectionsRenderer({
+                            map: map,
+                            suppressMarkers: true
+                        });
+                        
+                        directionsService.route({
+                            origin: currentPosition,
+                            destination: location,
+                            travelMode: 'WALKING',
+                        }, function(response, status) {
+                            if (status === 'OK') {
+                                directionsRenderer.setDirections(response);
+                                const duration = response.routes[0].legs[0].duration.text;
+                                alert('步行時間: ' + duration);
+                            }
+                        });
+                    } else {
+                        window.alert(segment.text);
+                    }
                 }
             }
         })
@@ -364,15 +430,90 @@
             }
 
             document.getElementById('restaurant-list').innerHTML += `
-                <li class="list-group-item">
-                    ${selectedRestaurant.name}
-                    <button class="btn-close float-end remove"></button>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px;">${selectedRestaurant.name}</span>
+                    <button class="btn-close remove"></button>
                 </li>
             `;
             
-            const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];    
+            let restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];    
             
             const color = colors[restaurantList.length % 4]
+            
+            // 如果輪盤只有一個預設項目，先清空
+            if (wheel.segments.length === 1 && wheel.segments[1].text === '請加入餐廳') {
+                wheel = new Winwheel({
+                    numSegments: 0,
+                    segments: [],
+                    pins: true,
+                    animation: {
+                        type: 'spinToStop',
+                        spins: 16,
+                        easing: 'Power4.easeInOut',
+                        callbackFinished: async function (segment){
+                            document.getElementById('canvas').style.display = 'none';
+                            document.getElementById('wheel').style.display = 'none';
+                            wheel.rotationAngle = 0;
+                            wheel.draw();
+                            
+                            const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
+                            const selectedRestaurant = restaurantList.find(r => r.name === segment.text);
+                            
+                            if (selectedRestaurant && selectedRestaurant.location) {
+                                window.alert('🎉 抽中: ' + segment.text);
+                                
+                                const location = new google.maps.LatLng(
+                                    selectedRestaurant.location.lat,
+                                    selectedRestaurant.location.lng
+                                );
+                                map.setCenter(location);
+                                map.setZoom(17);
+                                
+                                if(marker) marker.map = null;
+                                
+                                marker = new AdvancedMarkerElement({
+                                    map: map,
+                                    position: location,
+                                    title: selectedRestaurant.name
+                                });
+                                
+                                if(!infoWindow) infoWindow = new google.maps.InfoWindow();
+                                
+                                infoWindow.setContent(
+                                    `
+                                    <h3>${selectedRestaurant.name}</h3>
+                                    <div>地址: ${selectedRestaurant.address || '無'}</div>
+                                    <div>電話: ${selectedRestaurant.phoneNumber || '無'}</div>
+                                    <div>評分: ${selectedRestaurant.rating || '無'}</div>
+                                    `
+                                );
+                                infoWindow.open({anchor: marker, map: map});
+                                
+                                const directionsService = new google.maps.DirectionsService();
+                                const directionsRenderer = new google.maps.DirectionsRenderer({
+                                    map: map,
+                                    suppressMarkers: true
+                                });
+                                
+                                directionsService.route({
+                                    origin: currentPosition,
+                                    destination: location,
+                                    travelMode: 'WALKING',
+                                }, function(response, status) {
+                                    if (status === 'OK') {
+                                        directionsRenderer.setDirections(response);
+                                        const duration = response.routes[0].legs[0].duration.text;
+                                        alert('步行時間: ' + duration);
+                                    }
+                                });
+                            } else {
+                                window.alert(segment.text);
+                            }
+                        }
+                    }
+                });
+            }
+            
             wheel.addSegment({
                 fillStyle: color,
                 text: selectedRestaurant.name,
@@ -392,12 +533,86 @@
             let restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
             let addedCount = 0;
 
+            // 如果輪盤只有預設項目，重建輪盤
+            if (wheel.segments.length === 1 && wheel.segments[1].text === '請加入餐廳') {
+                wheel = new Winwheel({
+                    numSegments: 0,
+                    segments: [],
+                    pins: true,
+                    animation: {
+                        type: 'spinToStop',
+                        spins: 16,
+                        easing: 'Power4.easeInOut',
+                        callbackFinished: async function (segment){
+                            document.getElementById('canvas').style.display = 'none';
+                            document.getElementById('wheel').style.display = 'none';
+                            wheel.rotationAngle = 0;
+                            wheel.draw();
+                            
+                            const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
+                            const selectedRestaurant = restaurantList.find(r => r.name === segment.text);
+                            
+                            if (selectedRestaurant && selectedRestaurant.location) {
+                                window.alert('🎉 抽中: ' + segment.text);
+                                
+                                const location = new google.maps.LatLng(
+                                    selectedRestaurant.location.lat,
+                                    selectedRestaurant.location.lng
+                                );
+                                map.setCenter(location);
+                                map.setZoom(17);
+                                
+                                if(marker) marker.map = null;
+                                
+                                marker = new AdvancedMarkerElement({
+                                    map: map,
+                                    position: location,
+                                    title: selectedRestaurant.name
+                                });
+                                
+                                if(!infoWindow) infoWindow = new google.maps.InfoWindow();
+                                
+                                infoWindow.setContent(
+                                    `
+                                    <h3>${selectedRestaurant.name}</h3>
+                                    <div>地址: ${selectedRestaurant.address || '無'}</div>
+                                    <div>電話: ${selectedRestaurant.phoneNumber || '無'}</div>
+                                    <div>評分: ${selectedRestaurant.rating || '無'}</div>
+                                    `
+                                );
+                                infoWindow.open({anchor: marker, map: map});
+                                
+                                const directionsService = new google.maps.DirectionsService();
+                                const directionsRenderer = new google.maps.DirectionsRenderer({
+                                    map: map,
+                                    suppressMarkers: true
+                                });
+                                
+                                directionsService.route({
+                                    origin: currentPosition,
+                                    destination: location,
+                                    travelMode: 'WALKING',
+                                }, function(response, status) {
+                                    if (status === 'OK') {
+                                        directionsRenderer.setDirections(response);
+                                        const duration = response.routes[0].legs[0].duration.text;
+                                        alert('步行時間: ' + duration);
+                                    }
+                                });
+                            } else {
+                                window.alert(segment.text);
+                            }
+                        }
+                    }
+                });
+            }
+
             markedPlaces.forEach(place => {
                 if (!restaurantList.some(r => r.placeId === place.placeId)) {
                     document.getElementById('restaurant-list').innerHTML += `
-                        <li class="list-group-item">
-                            ${place.name}
-                            <button class="btn-close float-end remove"></button>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px;">${place.name}</span>
+                            <button class="btn-close remove"></button>
                         </li>
                     `;
 
