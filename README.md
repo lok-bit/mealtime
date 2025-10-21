@@ -218,5 +218,5 @@ mealtime/
 
 ## 參考資料
 
-- [Google API 介紹](https://mile.cloud/zh/resources/blog/What-is-Google-API-one-time-to-know-five-types-of-Google-API_60)) - 提供強大的地圖 API
+- [Google API 介紹](https://mile.cloud/zh/resources/blog/What-is-Google-API-one-time-to-know-five-types-of-Google-API_60)) - Google API 是什麼？一次搞懂五種 Google API
 - [Winwheel.js](https://dougtesting.net/winwheel/history)) - 轉盤動畫庫
