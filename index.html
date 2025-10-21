@@ -29,6 +29,11 @@
     #restaurant-list {
         width: 50%;
     }
+    #restaurant-list .list-group-item {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
     #wheel{
         position: fixed;
         top: 0;
@@ -325,9 +330,10 @@
                 
                 if (currentType === type) {
                     clearTypeMarkers();
+                    markedPlaces = [];
                     currentType = null;
                 } else {
-                    clearTypeMarkers();
+                    // 不要清除標記,只是切換類型
                     currentType = type;
                     searchRestaurants(type);
                 }
