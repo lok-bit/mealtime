@@ -42,11 +42,15 @@
         right: 0;
         top: 0;
         padding: 10px;
+        z-index: 10;
     }
     .restaurant-type {
         margin-bottom: 8px;
         writing-mode: vertical-rl;
         text-orientation: upright;
+    }
+    .pac-container {
+        z-index: 10000;
     }
 </style>
 
@@ -56,7 +60,7 @@
         <div id="map"></div>
         <div id="sidebar">
             <h3>吃什麼?</h3>
-            <input id="search-input" class="form-control"/>
+            <input id="search-input" class="form-control" placeholder="搜尋餐廳..."/>
             <button class="btn btn-primary mt-2" id="add">加入列表</button>
             <button class="btn btn-primary mt-2" id="add1">加入全部</button>
             <h4 class="mt-4">抽選列表</h4>
@@ -65,12 +69,12 @@
             <div id="wheel"></div>
             <canvas id="canvas" width="600" height="600"></canvas>
             <div id="restaurant-buttons">
-                <button class="btn btn-secondary restaurant-type" data-type="chinese">中式</button>
-                <button class="btn btn-secondary restaurant-type" data-type="japanese">日式</button>
-                <button class="btn btn-secondary restaurant-type" data-type="hot pot">火鍋</button>
-                <button class="btn btn-secondary restaurant-type" data-type="curry">咖哩</button>
-                <button class="btn btn-secondary restaurant-type" data-type="fast_food">快餐</button>
-                <button class="btn btn-secondary restaurant-type" data-type="barbecue">燒烤</button>
+                <button class="btn btn-secondary restaurant-type" data-type="中式餐廳">中式</button>
+                <button class="btn btn-secondary restaurant-type" data-type="日式料理">日式</button>
+                <button class="btn btn-secondary restaurant-type" data-type="火鍋">火鍋</button>
+                <button class="btn btn-secondary restaurant-type" data-type="咖哩">咖哩</button>
+                <button class="btn btn-secondary restaurant-type" data-type="速食">快餐</button>
+                <button class="btn btn-secondary restaurant-type" data-type="燒烤">燒烤</button>
             </div>
         </div>
     </div>
@@ -85,161 +89,212 @@
         let currentType = null;
         let typeMarkers = [];
         let markedPlaces = [];
+        let Place, AdvancedMarkerElement;
  
-        function initMap(){ 
-            map = new google.maps.Map(document.getElementById('map'),{
-                center:{lat: 23.553118, lng: 121.0211024},
+        async function initMap(){ 
+            // 載入必要的 libraries
+            const { Map } = await google.maps.importLibrary("maps");
+            const { AdvancedMarkerElement: AME } = await google.maps.importLibrary("marker");
+            const { Place: PlaceClass } = await google.maps.importLibrary("places");
+            
+            AdvancedMarkerElement = AME;
+            Place = PlaceClass;
+
+            map = new Map(document.getElementById('map'), {
+                center: {lat: 23.553118, lng: 121.0211024},
                 zoom: 7,
+                mapId: 'DEMO_MAP_ID'  // 新版 API 需要 mapId
             });
     
-            navigator.geolocation.getCurrentPosition(function (position){
-                currentPosition = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude,
-                };
-    
-                map.setCenter(currentPosition);
-                map.setZoom(16);
-    
-                const autocomplete = new google.maps.places.Autocomplete(
-                    document.getElementById('search-input'),
-                    {
-                        types:['restaurant'],
-                        bounds:{
-                            east: currentPosition.lng + 0.01,
-                            west: currentPosition.lng - 0.01,
-                            south: currentPosition.lat - 0.01,
-                            north: currentPosition.lat + 0.01,
-                        },
-                        strictBounds: false,
-                    }
-                );
-    
-                autocomplete.addListener('place_changed', function() {
-                    const place = autocomplete.getPlace();
-
-                    if (!place.geometry || !place.geometry.location) {
-                        alert("找不到該餐廳的位置資訊");
-                        return;
-                    }
-    
-                    selectedRestaurant = {
-                        location: place.geometry.location,
-                        placeId: place.place_id,
-                        name: place.name,
-                        address: place.formatted_address,
-                        phoneNumber: place.formatted_phone_number,
-                        rating: place.rating,
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async function (position) {
+                    currentPosition = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
                     };
-                    
-                    map.setCenter(selectedRestaurant.location);
-    
-                    if(marker) {
-                        marker.setMap(null);
-                    }
-    
-                    marker = new google.maps.Marker({
-                        map: map,
-                        position: selectedRestaurant.location,
-                        title: selectedRestaurant.name
-                    });
-
-                    if(!infoWindow){
-                        infoWindow = new google.maps.InfoWindow();
-                    }
-
-                    infoWindow.setContent(
-                        `
-                        <h3>${selectedRestaurant.name}</h3>
-                        <div>地址:${selectedRestaurant.address}</div>
-                        <div>電話:${selectedRestaurant.phoneNumber || '無'}</div>
-                        <div>評分:${selectedRestaurant.rating || '無'}</div>
-                        `
+        
+                    map.setCenter(currentPosition);
+                    map.setZoom(16);
+        
+                    // 使用舊版 Autocomplete (因為新版的 Web Component 整合較複雜)
+                    const autocomplete = new google.maps.places.Autocomplete(
+                        document.getElementById('search-input'),
+                        {
+                            types: ['restaurant'],
+                            bounds: {
+                                east: currentPosition.lng + 0.01,
+                                west: currentPosition.lng - 0.01,
+                                south: currentPosition.lat - 0.01,
+                                north: currentPosition.lat + 0.01,
+                            },
+                            strictBounds: false,
+                        }
                     );
-                    infoWindow.open(map, marker);
-                });
+        
+                    autocomplete.addListener('place_changed', async function() {
+                        const place = autocomplete.getPlace();
 
-                // 顯示使用者位置標記
-                new google.maps.Marker({
-                    position: currentPosition,
-                    map: map,
-                    icon: {
-                        url: "https://maps.gstatic.com/intl/en_us/mapfiles/markers2/measle_blue.png",
-                        size: new google.maps.Size(14, 14),
-                        origin: new google.maps.Point(0, 0),
-                        anchor: new google.maps.Point(7, 7)
-                    },
-                    title: "You are here!"
-                });
-            });
-        }
-    
-        function clearTypeMarkers() {
-            typeMarkers.forEach(marker => marker.setMap(null));
-            typeMarkers = [];
-        }
-    
-        function searchRestaurants(type) {
-            const service = new google.maps.places.PlacesService(map);
-            const request = {
-                location: currentPosition,
-                radius: '1000',
-                type: ['restaurant'],
-                keyword: type
-            };
-    
-            service.nearbySearch(request, function (results, status) {
-                if (status === google.maps.places.PlacesServiceStatus.OK) {
-                    markedPlaces = [];
-
-                    results.forEach(place => {
-                        const marker = new google.maps.Marker({
-                            map: map,
-                            position: place.geometry.location,
-                            title: place.name
-                        });
-                        
-                        typeMarkers.push(marker);
-    
-                        marker.addListener('click', function() {
-                            if(!infoWindow) {
-                                infoWindow = new google.maps.InfoWindow();
-                            }
-    
-                            infoWindow.setContent(
-                                `
-                                <h3>${place.name}</h3>
-                                <div>地址:${place.vicinity}</div>
-                                <div>評分:${place.rating || '無評分'}</div>
-                                `
-                            );
-                            infoWindow.open(map, marker);
-                        });
-
-                        markedPlaces.push({
-                            name: place.name,
-                            placeId: place.place_id,
-                            phoneNumber: place.formatted_phone_number,
-                            address: place.vicinity,
-                            rating: place.rating,
+                        if (!place.geometry || !place.geometry.location) {
+                            alert("找不到該餐廳的位置資訊");
+                            return;
+                        }
+        
+                        selectedRestaurant = {
                             location: {
                                 lat: place.geometry.location.lat(),
                                 lng: place.geometry.location.lng()
-                            }
+                            },
+                            placeId: place.place_id,
+                            name: place.name,
+                            address: place.formatted_address,
+                            phoneNumber: place.formatted_phone_number,
+                            rating: place.rating,
+                        };
+                        
+                        map.setCenter(place.geometry.location);
+        
+                        if(marker) {
+                            marker.map = null;
+                        }
+        
+                        marker = new AdvancedMarkerElement({
+                            map: map,
+                            position: place.geometry.location,
+                            title: selectedRestaurant.name
+                        });
+
+                        if(!infoWindow){
+                            infoWindow = new google.maps.InfoWindow();
+                        }
+
+                        infoWindow.setContent(
+                            `
+                            <h3>${selectedRestaurant.name}</h3>
+                            <div>地址:${selectedRestaurant.address}</div>
+                            <div>電話:${selectedRestaurant.phoneNumber || '無'}</div>
+                            <div>評分:${selectedRestaurant.rating || '無'}</div>
+                            `
+                        );
+                        infoWindow.open({
+                            anchor: marker,
+                            map: map
                         });
                     });
 
-                    console.log('找到餐廳:', markedPlaces.length);
-                } else {
-                    console.error('搜尋失敗:', status);
-                    alert('附近沒有找到相關餐廳');
-                }
+                    // 顯示使用者位置標記
+                    new AdvancedMarkerElement({
+                        map: map,
+                        position: currentPosition,
+                        title: "You are here!"
+                    });
+                });
+            }
+        }
+    
+        function clearTypeMarkers() {
+            typeMarkers.forEach(marker => {
+                marker.map = null;
             });
+            typeMarkers = [];
+        }
+    
+        async function searchRestaurants(keyword) {
+            if (!currentPosition) {
+                alert('正在取得您的位置,請稍後再試');
+                return;
+            }
+
+            console.log('開始搜尋:', keyword);
+
+            try {
+                // 使用新版 Place.searchByText
+                const request = {
+                    textQuery: keyword,
+                    fields: ['displayName', 'location', 'rating', 'formattedAddress', 'internationalPhoneNumber', 'id'],
+                    locationBias: {
+                        center: currentPosition,
+                        radius: 2000  // 增加搜尋半徑到 2km
+                    },
+                    maxResultCount: 20,
+                    language: 'zh-TW'
+                };
+
+                const { places } = await Place.searchByText(request);
+                
+                if (!places || places.length === 0) {
+                    alert('附近沒有找到相關餐廳,請試試其他類別');
+                    return;
+                }
+
+                console.log('找到餐廳數量:', places.length);
+                
+                // 清空舊資料
+                markedPlaces = [];
+                clearTypeMarkers();
+
+                // 處理每個餐廳
+                for (const place of places) {
+                    const marker = new AdvancedMarkerElement({
+                        map: map,
+                        position: place.location,
+                        title: place.displayName
+                    });
+                    
+                    typeMarkers.push(marker);
+
+                    // 點擊標記顯示資訊
+                    marker.addListener('click', () => {
+                        if(!infoWindow) {
+                            infoWindow = new google.maps.InfoWindow();
+                        }
+
+                        infoWindow.setContent(
+                            `
+                            <h3>${place.displayName}</h3>
+                            <div>地址: ${place.formattedAddress || '無地址資訊'}</div>
+                            <div>評分: ${place.rating || '無評分'}</div>
+                            `
+                        );
+                        infoWindow.open({
+                            anchor: marker,
+                            map: map
+                        });
+                    });
+
+                    // 將餐廳資料加入列表
+                    markedPlaces.push({
+                        name: place.displayName,
+                        placeId: place.id,
+                        phoneNumber: place.internationalPhoneNumber,
+                        address: place.formattedAddress,
+                        rating: place.rating,
+                        location: {
+                            lat: place.location.lat,
+                            lng: place.location.lng
+                        }
+                    });
+                }
+
+                console.log('已標記餐廳:', markedPlaces.length);
+                alert(`找到 ${markedPlaces.length} 間餐廳`);
+
+            } catch (error) {
+                console.error('搜尋錯誤:', error);
+                
+                if (error.message && error.message.includes('PERMISSION_DENIED')) {
+                    alert('❌ Places API (New) 尚未啟用\n\n請到 Google Cloud Console 啟用:\n1. 搜尋 "Places API (New)"\n2. 點擊啟用\n3. 等待 2-5 分鐘');
+                } else {
+                    alert('搜尋餐廳時發生錯誤: ' + error.message);
+                }
+            }
         }
 
+        // 餐廳類別按鈕
         document.querySelectorAll('.restaurant-type').forEach(button => {
             button.addEventListener('click', function () {
                 const type = this.getAttribute('data-type');
+                
+                console.log('點擊按鈕:', type);
                 
                 if (currentType === type) {
                     clearTypeMarkers();
@@ -253,6 +308,7 @@
             });
         });
     
+        // 載入已儲存的餐廳列表
         const restaurantList = JSON.parse(localStorage.getItem('restaurantList')) || [];
         
         restaurantList.forEach(function(restaurant){
@@ -409,7 +465,7 @@
     </script>
     <script 
         async
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCp3an_zxqAuxOhq4GKvNkTZKpafqyQZ8s&loading=async&libraries=places&callback=initMap&region=TW&language=zh-TW">
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCp3an_zxqAuxOhq4GKvNkTZKpafqyQZ8s&loading=async&libraries=places,marker&callback=initMap&region=TW&language=zh-TW">
     </script>   
      
 </body>
